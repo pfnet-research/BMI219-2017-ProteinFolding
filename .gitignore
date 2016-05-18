@@ -1,0 +1,7 @@
+*.npy
+.*
+*~
+!.gitignore
+*.pyc
+result*/
+data/
