@@ -3,7 +3,6 @@ import argparse
 import chainer
 from chainer import cuda
 from chainer import iterators
-from chainer import links as L
 from chainer import optimizer as optimizer_
 from chainer import optimizers
 from chainer import training
@@ -13,6 +12,7 @@ import numpy
 from lib.data import cb513
 from lib.models import model
 from lib.evaluations import evaluator
+from lib.models import classifier
 
 
 parser = argparse.ArgumentParser(
@@ -61,7 +61,7 @@ validate_iter = iterators.SerialIterator(validate_dataset, args.batchsize,
 # model
 model = model.make_model(V, args.embed_dim, args.channel_num,
                          args.rnn_dim, args.fc_dim, C)
-classifier = L.Classifier(model)
+classifier = classifier.Classifier(model)
 if args.gpu >= 0:
     classifier.to_gpu()
 
