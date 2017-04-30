@@ -10,4 +10,3 @@ class Evaluator(E.Evaluator):
         ret = super(Evaluator, self).evaluate()
         predictor.train = train
         return ret
-        

@@ -2,7 +2,7 @@ import chainer
 from chainer import functions as F
 from chainer import links as L
 
-from lib.models import mlp
+from lib.models import mlp as mlp_
 from lib.models import cnn as cnn_
 from lib.models import rnn as rnn_
 
@@ -26,23 +26,23 @@ class Model(chainer.Chain):
         x = F.relu(self.cnn(x))
         xs = F.split_axis(x, timestep, 2)
         xs = self.rnn(xs)
-        ys = [self.fc(x) for x in xs]
+        ys = [self.mlp(x) for x in xs]
         return F.stack(ys, -1)
 
 
 def make_model(vocab, embed_dim, channel_num,
-               rnn_dim, fc_dim, class_num):
+               rnn_dim, mlp_dim, class_num):
     embed = L.EmbedID(vocab, embed_dim, ignore_label=-1)
 
     channels = (channel_num,) * 3
-    windows = [(3, embed_dim), (7, embed_dim), (11, embed_dim)]
-    cnn = cnn_.MultiScaleCNN(1, channels, windows)
+    kernel_sizes = [(3, embed_dim), (7, embed_dim), (11, embed_dim)]
+    cnn = cnn_.MultiScaleCNN(1, channels, kernel_sizes)
 
     conv_out_dim = channel_num * 3
-    rnn = rnn_.StackedBiRNN(conv_out_dim, rnn_dim)
+    rnn = rnn_.StackedBiRNN(conv_out_dim, rnn_dim, rnn_dim, 3)
 
-    fc = mlp.MLP(fc_dim, class_num)
+    mlp = mlp_.MLP(mlp_dim, class_num)
 
-    model = Model(embed=embed, cnn=cnn, rnn=rnn, fc=fc)
+    model = Model(embed=embed, cnn=cnn, rnn=rnn, mlp=mlp)
     model.train = True
     return model
