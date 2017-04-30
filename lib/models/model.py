@@ -21,11 +21,12 @@ class Model(chainer.Chain):
 
     def __call__(self, x):
         timestep = x.data.shape[1]
+        is_seq = acid.data != -1
         x = self.embed(x)
         x = F.expand_dims(x, 1)
         x = F.relu(self.cnn(x))
         xs = F.split_axis(x, timestep, 2)
-        xs = self.rnn(xs)
+        xs = self.rnn(xs, is_seq)
         ys = [self.fc(x) for x in xs]
         return F.stack(ys, -1)
 

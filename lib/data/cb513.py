@@ -32,6 +32,8 @@ def load(fname, debug, V, C, T=700, L=57):
         absolute_solvent_labels = absolute_solvent_labels[..., :100]
         relative_solvent_labels = relative_solvent_labels[..., :100]
 
-    return datasets.TupleDataset(acids, profiles, structure_labels,
+
+    return datasets.TupleDataset(acids, profiles,
+                                 structure_labels,
                                  absolute_solvent_labels,
                                  relative_solvent_labels)
