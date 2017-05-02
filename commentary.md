@@ -1,30 +1,67 @@
 # Introduction
 
+Prediction of the secondary structure of proteins is classical, but still important
+and active research area in bioinformatics.
+In this example, we apply deep learning to solve this task.
+We will adopt the architecture that recently proposed in [1], which combines RNNs and CNNs.
 
 # Dataset creation
 
-We use the same dataset as [1].
+We use the same dataset as the original paper, which is available from
+the following URL:
 
-The dataset is available from
-http://www.princeton.edu/~jzthree/datasets/ICML2014/
+* Download URL: http://www.princeton.edu/~jzthree/datasets/ICML2014/
 
-Preprocess is already done by the original creator of the dataset.
-We need the minimal preprocessing.
+Fortunately, the creator of the dataset, (which is different from the authors of [1])
+had preprocessed the raw dataset to some extent already.
+So, we need the minimal preprocessing to plug the data to our model.
 
-Each sample is represented as a pair of two sequences: one is a list of protein ids
-and the other is a list of
+Each sample represents a single protein and has the following information:
 
-So it is a kind of sequential prediction.
+* Amino acid sequence
+* Structure information
+* Profile features obtained from the PSI-BLAST log file [1]
+* Solvenct accesibility (relative and absolute, respectively).
+
+We use the amino acid sequence as a input feature vector
+and the structure information as a target label.
+
+In the original paper, profile features are also used as an input feature,
+to do a multi-task learning.
+
+Further, in [1], they predict solvency information as well as structure information during training to enhance the prediction accuracy of the original task.
+But to simplify the example, we only use protein ID and does not use structure information.
+
+Amino acid sequences are represented as a sequence of integers,
+each of which represents an ID of one of 21 amino acids.
+
+The structure is represented as Q8, or one of the 8 categories:
+3_10−helix (G), α−helix (H), π−helix (I), β−strand (E), β−bridge (B), β−turn (T), bend (S) and loop or irregular (L).
+This information is attached to each amino acid.
+Therefore, the length of amino acid sequence and that of structure information.
 
 The original sequence length is 700.
-To reduce the computational time, we cut off the first 100 sequences.
+But to reduce the computational time, we cut off the first 100 sequences.
 
-To simplify the example, we only use protein ID and does not use structure information.
-Further, we do not do multi-task learning as does in [1].
-In [1], they predict solvency information as well as structure information during training.
+Note that not all sequences have 700 amino acids,
+if the length is less than 700, we pad the special integer that represents "no sequence".
 
-In "multi-modal" branch, we do multi-task, multi-modal learning with
-by introducing the information that is ignored.
+In summary, it is a sequential 8-class classification as a machine learning task.
+
+## Tuple dataset
+
+We prepare the dataset as an instance of [`TupleDataset`](http://docs.chainer.org/en/stable/reference/datasets.html#chainer.datasets.TupleDataset):
+
+```python
+def load(fname, V, C, T=700, L=57):
+    raw_data = numpy.load(fname)
+
+    '''
+    extract amino acid sequence and structure labels from raw data
+    '''
+
+    return datasets.TupleDataset(acids, structure_labels)
+```
 
 
 # Model
@@ -52,7 +89,7 @@ def make_model(vocab, embed_dim, channel_num,
     # ...
     mlp = mlp_.MLP(mlp_dim, class_num)
     # ...
-    model = Model(embed=embed, cnn=cnn, rnn=rnn, fc=fc)
+    model = Model(embed=embed, cnn=cnn, rnn=rnn, mlp=mlp)
     # ...
     return model
 ```
@@ -62,6 +99,8 @@ It sequentially applies input features to each component.
 
 ```python
 class Model(chainer.Chain):
+
+    # (Omitted)
 
     def __call__(self, x):
         timestep = x.data.shape[1]
@@ -99,6 +138,8 @@ where `D` is the number of output units.
 `L.EmbedID` converts an integer to one-hot vector and applies it to a fully-connected layer.
 For computational efficiency, the implementation takes a different approach, but, it does essentially the same thing.
 
+If `B` is a batch size and `T` is a length of each sample, the input to the model has a shape `(B, T)`. The shape of the output is `(B, T, D)` where `D` is a embedding dimension.
+
 # CNN
 
 We next convolve the resulting embedded vector along time direction.
@@ -135,10 +176,13 @@ The forward propagation is to push input vectors to each links and concatenate
 the outputs along the channel axis.
 (`ChainList` can get child links via `self`)
 
+
 ```python
-def __call__(self, x):
-    xs = [l(x) for l in self]
-    return F.concat(xs, 1)
+class MultiScaleCNN(chainer.ChainList):
+
+    def __call__(self, x):
+        xs = [l(x) for l in self]
+        return F.concat(xs, 1)
 ```
 
 Q. Check the shape of input and output tensors of `MultiScaleCNN`.
@@ -151,6 +195,38 @@ Q. Check the shape of input and output tensors of `MultiScaleCNN`.
 Following the original paper, we use GRU as a RNN unit, which is one of the most
 common building blocks of RNNs as well as with LSTM.
 
+Roughly speaking, there are two ways to implement RNN units: stateless and stateful.
+Stateless RNN units does not hold the internal state and takes it as an input.
+
+At time `t`, the status update is formulated as follows:
+
+```
+h' = f(h, x)
+```
+
+where `x` is a input at time `t` and `h'` and 'h' are states of RNN at time `t-1` and `t`, respectively.
+
+The pseudo code of Stateless GRU is as follows:
+
+```python
+class StatelessGRU(object):
+
+    def __call__(self, h, x):
+        return f(h, x)
+```
+
+Contrary to that, the stateful GRU holds the state of RNN and update it
+at every step:
+
+```python
+class StatefulGRU(object):
+
+    def __call__(self, x):
+        self.h = f(self.h, x)
+        return self.h
+```
+
+Some deep learning frameworks supports either of stateless and stateful and some supports both.
 Chainer implements a stateless GRU as [L.GRU](http://docs.chainer.org/en/stable/reference/links.html?highlight=GRU#chainer.links.GRU)
 and a stateful one as [L.StatefulGRU](http://docs.chainer.org/en/stable/reference/links.html?highlight=GRU#chainer.links.StatefulGRU)
 
@@ -214,19 +290,25 @@ class StackedBiRNN(chainer.Chain):
         return xs
 ```
 
-`xs_f` is a list of the output of the forward RNN and `xs_r` is the reverse RNN.
+Here, `xs_f` is a list of the output of the forward RNN and `xs_r` is the reverse RNN.
+Be aware that we have to feed the reverse RNN with the input data from the last.
+`[::-1]` is a handy way to reverse a sequence:
 
-Be aware that from the last
+```python
+a = [1, 2, 3]
+a[::-1] # => [3, 2, 1]
+```
+
+Q. Check [the specification of slices](https://docs.python.org/3/library/functions.html#slice) to see how it works.
 
 As we expect `StackedBiRNN` is followed by a MLP, we insert dropout layers
 to not only the intermediate layers but to the final layer.
 
 
-Strictly speaking, we must skip the update of internal states when the input at corresponding time is `no_seq`. But we do not do it for simplicity.
+Q. Strictly speaking, we must skip the update of internal states when the input at corresponding time is `no_seq`. But we do not do it for simplicity.
 See "skip-status-update" branch if you are interested in how to do that.
 
-
-# MLP convolution
+## MLP
 
 [1] used 2 fully-connected layers to get the final prediction.
 There are two possibilities how to put them on top of RNN layers.
@@ -241,26 +323,32 @@ is preprocessed so that all samples have same length.
 
 The other way is to apply the same MLP to each time step.
 In this case, we do not have such a restriction on time length.
-We chose this method in this example.
+We choose this method in this example.
+
+We should simply apply the same to the output sequence
 
 ```python
-def __call__(self, x):
-    timestep = x.data.shape[1]
-    x = self.embed(x)
-    x = F.expand_dims(x, 1)
-    x = F.relu(self.cnn(x))
-    xs = F.split_axis(x, timestep, 2)
-    xs = self.rnn(xs)
-    ys = [self.fc(x) for x in xs]
-    return F.stack(ys, -1)
+class Model(chainer.Chain):
+
+    # (Omitted)
+
+    def __call__(self, x):
+        # (Omitted)
+        ys = [self.mlp(x) for x in xs]  # apply MLP
+        return F.stack(ys, -1)
 ```
 
-Chainer has `L.MLPConvolution2D` for implementing this method.
-(originally, this is for 1x1 convolution in image recognition.
-but we can use)
+Q. We can implement the MLP part equivalent to the former one with
+[`L.MLPConvolution2D`](http://docs.chainer.org/en/stable/reference/links.html?highlight=MLPconvolution2D#chainer.links.MLPConvolution2D).
+Read the document and re-implement `Model.__call__`.
 
-Q. Change `Model.__call__` to use `L.MLPConvolution2D` as the MLP part.
+## Putting them all together
 
+Q. In the original paper, the model has a direct connection from the output of CNN to
+the input of MLP, which our current model does not have. Implement it so that the architecture
+agree with the original one.
+Looking at their experiment, it does not improve the final performance so much.
+But it is a good excersize to get used to Chainer.
 
 # Training
 
@@ -270,31 +358,74 @@ Q. Change `Model.__call__` to use `L.MLPConvolution2D` as the MLP part.
 In each parameter update, we shrink the parameters as follows:
 
 ```
-w <- w - eta w
+w <- w - \eta w
 ```
 where `eta` is a hyper parameter that determines the amount of regularization.
 
 It is equivalent to online L2 regularization.
 
-In Chainer, we can realize weight decay as a hook to optimizers.
-
-
+In Chainer, we can realize weight decay as a [`WeightDecay`](http://docs.chainer.org/en/stable/reference/core/optimizer.html?highlight=WeightDecay#chainer.optimizer.WeightDecay)
+hook to optimizers.
 
 The hook is any callable that takes the hooked optimizer in its `__call__` method.
 
 We apply weight decay, following the original paper [1].
 
-
 ```python
 optimizer.add_hook(WeightDecay(1e-3))
 ```
+
 
 ## TestEvaluator
 
 As the model includes dropout, which should behave differently in training and test phases, we need to change it accordingly.
 
+The core part of [`Evaluator`](http://docs.chainer.org/en/stable/reference/extensions.html#evaluator) is
+`evaluate`. So we overwrite it as follows:
 
+```python
+class Evaluator(E.Evaluator):
 
+    def evaluate(self):
+        predictor = self.get_target('main').predictor
+        train = predictor.train
+        predictor.train = False
+        ret = super(Evaluator, self).evaluate()
+        predictor.train = train
+        return ret
+```
+
+### Note on Chainer v2
+
+We will release Chainer v2, or the first major version up of Chainer soon.
+
+In v2, Chainer has the current phases (training/test etc.) as a global variable.
+So, each chain need not to have an attribute to determine its mode by themselves
+(e.g. `train` attribute of `Model` in this example).
+
+Specifically, mode switching would be something like this
+(be aware that v2 is currently under development, so APIs are subject to change):
+
+```python
+model = Model(embed=embed, cnn=cnn, rnn=rnn, mlp=mlp)
+
+x = numpy.random.uniform(-1, 1, (10, 100))  # dummy minibatch
+
+with chainer.config.using_config('train', True):
+    y = model(x)  # runs in training mode
+
+with chainer.config.using_config('train', False):
+    y = model(x)  # runs in test mode
+```
+
+# Multi-task, multi-modal learning
+
+Q. As explained earlier, we do not use profile features and solvent accesibility.
+Change the code to support multi-task, multi-modal learning
+
+1. Fix `load` so that `TupleDataset` includes all information.
+2. The model is wrapped with `L.Classifier`, but `__call__` method of [`L.Classifier`](http://docs.chainer.org/en/stable/reference/links.html#classifier) interprets that its last argument as the target label and the rest as input features. This is not the case in this extension. So, create customized `Classifier` and substitute it with `L.Classifier`.
+3. Fix `Model` to accept multiple inputs.
 
 
 # Reference
