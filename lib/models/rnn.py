@@ -32,7 +32,7 @@ class StackedBiRNN(chainer.Chain):
         T = len(xs)
         for f, r in six.moves.zip(self.forward, self.reverse):
             xs_f = [f(x) for x in xs]
-            xs_r = [r(xs[i]) for i in six.moves.range(T - 1, -1, -1)]
+            xs_r = [r(x) for i in xs[::-1]]
             xs_r.reverse()
             xs = [F.dropout(F.concat((x_f, x_r)), train=self.train)
                   for (x_f, x_r) in six.moves.zip(xs_f, xs_r)]
