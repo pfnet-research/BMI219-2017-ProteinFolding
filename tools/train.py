@@ -10,9 +10,9 @@ from chainer.training import extensions as E
 import numpy
 
 from lib.data import jzthree
-from lib.models import model
 from lib.evaluations import evaluator as evaluator_
 from lib.models import classifier
+from lib.models import model
 
 
 parser = argparse.ArgumentParser(
