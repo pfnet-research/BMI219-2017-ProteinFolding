@@ -2,8 +2,8 @@ import chainer
 from chainer import functions as F
 from chainer import links as L
 
-from lib.models import mlp as mlp_
 from lib.models import cnn as cnn_
+from lib.models import mlp as mlp_
 from lib.models import rnn as rnn_
 
 
