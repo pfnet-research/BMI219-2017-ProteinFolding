@@ -66,7 +66,7 @@ def load(fname, V, C, T=700, L=57):
 
 # Model
 
-## overall
+## Overall
 
 The model consists of four sub networks: ID embedding,
 (multi-scale) convolutional neural network (CNN),
@@ -77,25 +77,23 @@ In this example, we construct the model in `lib.models.model.make_model`.
 This method essentially constructs each component as a chain
 and builds the whole model with them.
 
+Here is the pseudo code:
 ```python
 def make_model(vocab, embed_dim, channel_num,
-               rnn_dim, fc_dim, class_num):
-    # ..
-    embed = L.EmbedID(vocab, embed_dim, ignore_label=-1)
-    # ...
-    cnn = cnn_.MultiScaleCNN(1, channels, windows)
-    # ...
-    rnn = rnn_.StackedBiRNN(conv_out_dim, rnn_dim)
-    # ...
-    mlp = mlp_.MLP(mlp_dim, class_num)
-    # ...
+               rnn_dim, mlp_dim, class_num):
+    # (Omitted)
+    embed = L.EmbedID(...)
+    cnn = cnn_.MultiScaleCNN(...)
+    rnn = rnn_.StackedBiRNN(...)
+    mlp = mlp_.MLP(...)
     model = Model(embed=embed, cnn=cnn, rnn=rnn, mlp=mlp)
-    # ...
+    # (Omitted)
     return model
 ```
 
 Forward propagation is defined in `Model.__call__` as is customarily done in Chainer.
 It sequentially applies input features to each component.
+
 
 ```python
 class Model(chainer.Chain):
@@ -117,8 +115,10 @@ In the following section, we explain the detail of each component one by one.
 
 ## ID embedding
 
-`L.EmbedID` converts each "word" represented as integer ID to a trainable vector.
-This is operation is called "embedding" as we embed each word to a feature space.
+First we convert each amino acid to a trainable float vector.
+
+[`L.EmbedID`](http://docs.chainer.org/en/stable/reference/links.html#embedid) converts each "word" represented as integer ID to a trainable float vector.
+This operation is called "embedding" as we embed each word to a feature space.
 
 In natural language processing research, we sometimes handle sentences,
 which is a sequence of words.
@@ -127,22 +127,15 @@ continuous values like
 In analogy, proteins are represented as "biological sentences" which consists of
 21 types of amid acids ("biological word").
 
-Each protein is represented as integers.
-
-In usual setting, IDs are converted to one-hot vector and fed to
-e.g. fully-connected layer.
-Let the number of protein types be `C`, then,
-the first fully connected layer has a weight matrix of size `C x D`
-where `D` is the number of output units.
-
-`L.EmbedID` converts an integer to one-hot vector and applies it to a fully-connected layer.
+What `L.EmbedID` essentially does is to convert an integer to one-hot vector and apply it to a fully-connected layer.
 For computational efficiency, the implementation takes a different approach, but, it does essentially the same thing.
 
 If `B` is a batch size and `T` is a length of each sample, the input to the model has a shape `(B, T)`. The shape of the output is `(B, T, D)` where `D` is a embedding dimension.
 
-# CNN
 
-We next convolve the resulting embedded vector along time direction.
+# Convolutional Neural Networks (CNN)
+
+Next we convolve the resulting embedded vectors along the time direction.
 As each sample has a shape `(T, D)` where `T` is a time step
 and `D` is the dimension of embedded vectors,
 we convolve the vectors with the kernel of shape `(t, D)`.
@@ -156,7 +149,7 @@ cnn = cnn_.MultiScaleCNN(
     [(3, embed_dim), (7, embed_dim), (11, embed_dim)])  # kernel sizes
 ```
 
-As `L.Convolution2D` cannot handle kernels of different sizes in single chain.
+As [`L.Convolution2D`](http://docs.chainer.org/en/stable/reference/links.html#convolution2d) cannot handle kernels of different sizes in single chain.
 Therefore, we prepare as many chains as the types of kernels.
 Specifically, we create `L.Convolution2D` for kernels of length 3, 7, and 11 and
 each chain has 64 kernels, resulting in 192 kernels in total.
@@ -170,12 +163,11 @@ class MultiScaleCNN(chainer.ChainList):
         super(MultiScaleCNN, self).__init__(*convolutions)
 ```
 
-Note that we add pad to keep the output size same as the input.
+Note that we add pads to keep the output size same as the input.
 
 The forward propagation is to push input vectors to each links and concatenate
 the outputs along the channel axis.
-(`ChainList` can get child links via `self`)
-
+We implement the forward propagation in `__call__` as usual:
 
 ```python
 class MultiScaleCNN(chainer.ChainList):
@@ -185,12 +177,14 @@ class MultiScaleCNN(chainer.ChainList):
         return F.concat(xs, 1)
 ```
 
+Note that `ChainList.self` represents the child links.
+
 Q. Check the shape of input and output tensors of `MultiScaleCNN`.
 
 
-# RNN
+## Recurrent Neural Networks (RNN)
 
-## Stateless and stateful GRUs
+### Stateless and stateful GRUs
 
 Following the original paper, we use GRU as a RNN unit, which is one of the most
 common building blocks of RNNs as well as with LSTM.
@@ -231,7 +225,7 @@ Chainer implements a stateless GRU as [L.GRU](http://docs.chainer.org/en/stable/
 and a stateful one as [L.StatefulGRU](http://docs.chainer.org/en/stable/reference/links.html?highlight=GRU#chainer.links.StatefulGRU)
 
 
-## Build stacked bi-directional GRUs
+### Build stacked bi-directional GRUs
 
 We use two-layered bi-directional GRU.
 First, we create a function that construct a uni-directional RNN.
@@ -250,8 +244,6 @@ Q. Why the output of layers other than the first layer is doubled?
 We combine two uni-directional RNNs, one is  going forward
 to create a bi-directional RNN:
 
-I did not use "reverse" instead of "backward" because what it implements is actually forward propagation :).
-
 ```python
 class StackedBiRNN(chainer.Chain):
 
@@ -261,6 +253,7 @@ class StackedBiRNN(chainer.Chain):
         super(StackedBiRNN, self).__init__(
             forward=forward, reverse=reverse)
 ```
+I did not use "reverse" instead of "backward" because what it implements is actually forward propagation :).
 
 As we will insert a dropout, which should behave differently in training and test phases, to the model. We add an attribute `train`, to specifies the mode of the model:
 
@@ -293,6 +286,8 @@ class StackedBiRNN(chainer.Chain):
 Here, `xs_f` is a list of the output of the forward RNN and `xs_r` is the reverse RNN.
 Be aware that we have to feed the reverse RNN with the input data from the last.
 `[::-1]` is a handy way to reverse a sequence:
+As we expect `StackedBiRNN` is followed by a MLP, we insert dropout layers
+to not only the intermediate layers but to the final layer.
 
 ```python
 a = [1, 2, 3]
@@ -301,14 +296,10 @@ a[::-1] # => [3, 2, 1]
 
 Q. Check [the specification of slices](https://docs.python.org/3/library/functions.html#slice) to see how it works.
 
-As we expect `StackedBiRNN` is followed by a MLP, we insert dropout layers
-to not only the intermediate layers but to the final layer.
-
-
 Q. Strictly speaking, we must skip the update of internal states when the input at corresponding time is `no_seq`. But we do not do it for simplicity.
 See "skip-status-update" branch if you are interested in how to do that.
 
-## MLP
+## Multi-layer perceptrons (MLP)
 
 [1] used 2 fully-connected layers to get the final prediction.
 There are two possibilities how to put them on top of RNN layers.
@@ -325,7 +316,7 @@ The other way is to apply the same MLP to each time step.
 In this case, we do not have such a restriction on time length.
 We choose this method in this example.
 
-We should simply apply the same to the output sequence
+We should simply apply the same MLP to the output sequence:
 
 ```python
 class Model(chainer.Chain):
@@ -333,13 +324,19 @@ class Model(chainer.Chain):
     # (Omitted)
 
     def __call__(self, x):
-        # (Omitted)
+        '''
+        Apply ID embedding, CNN, RNN sequentially to get xs.
+        '''
         ys = [self.mlp(x) for x in xs]  # apply MLP
         return F.stack(ys, -1)
 ```
 
-Q. We can implement the MLP part equivalent to the former one with
+Here `xs` is a list (of length `T`) of variable of shape `(D,)`.
+
+
+Q. We can implement the MLP part with
 [`L.MLPConvolution2D`](http://docs.chainer.org/en/stable/reference/links.html?highlight=MLPconvolution2D#chainer.links.MLPConvolution2D).
+Originally, this link is used to implement "1x1 convolution", which is used in the computer vision field. But we can also use it in this context.
 Read the document and re-implement `Model.__call__`.
 
 ## Putting them all together
@@ -362,19 +359,12 @@ w <- w - \eta w
 ```
 where `eta` is a hyper parameter that determines the amount of regularization.
 
-It is equivalent to online L2 regularization.
-
 In Chainer, we can realize weight decay as a [`WeightDecay`](http://docs.chainer.org/en/stable/reference/core/optimizer.html?highlight=WeightDecay#chainer.optimizer.WeightDecay)
-hook to optimizers.
-
-The hook is any callable that takes the hooked optimizer in its `__call__` method.
-
-We apply weight decay, following the original paper [1].
+hook to optimizers. Following the original paper, we apply weight decay.
 
 ```python
 optimizer.add_hook(WeightDecay(1e-3))
 ```
-
 
 ## TestEvaluator
 
