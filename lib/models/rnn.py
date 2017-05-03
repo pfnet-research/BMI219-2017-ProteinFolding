@@ -29,7 +29,6 @@ class StackedBiRNN(chainer.Chain):
 
     def __call__(self, xs):
         self.reset_state()
-        T = len(xs)
         for f, r in six.moves.zip(self.forward, self.reverse):
             xs_f = [f(x) for x in xs]
             xs_r = [r(x) for i in xs[::-1]]
