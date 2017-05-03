@@ -11,9 +11,6 @@ class MLP(chainer.ChainList):
         self.train = True
 
     def __call__(self, x):
-        N = len(self)
-        for i, f in enumerate(self):
-            x = f(x)
-            if i + 1 != N:
-                x = F.relu(F.dropout(x, train=self.train))
-        return x
+        for l in self[:-1]:
+            x = F.relu(l(x))
+        return self[-1](x)

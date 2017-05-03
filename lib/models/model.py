@@ -2,7 +2,7 @@ import chainer
 from chainer import functions as F
 from chainer import links as L
 
-from lib.models import mlp
+from lib.models import mlp as mlp_
 from lib.models import cnn as cnn_
 from lib.models import rnn as rnn_
 
@@ -45,7 +45,7 @@ def make_model(vocab, embed_dim, channel_num,
     cnn = cnn_.MultiScaleCNN(1, channels, windows)
 
     conv_out_dim = channel_num * 3
-    rnn = rnn_.StackedBiRNN(conv_out_dim, rnn_dim)
+    rnn = rnn_.StackedBiRNN(conv_out_dim, rnn_dim, rnn_dim, 3)
 
     fc_structure = mlp.MLP(fc_dim, structure_class_num)
     fc_absolute_solvent = mlp.MLP(fc_dim, 1)
