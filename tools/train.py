@@ -10,7 +10,7 @@ from chainer import training
 from chainer.training import extensions as E
 import numpy
 
-from lib.data import cb513
+from lib.data import jzthree
 from lib.models import model
 from lib.evaluations import evaluator as evaluator_
 
@@ -51,8 +51,8 @@ if args.gpu >= 0:
 
 # data
 V, C = 21, 8  # vocab, class_num
-train_dataset = cb513.load(args.train_file, V, C)
-validate_dataset = cb513.load(args.validate_file, V, C)
+train_dataset = jzthree.load(args.train_file, V, C)
+validate_dataset = jzthree.load(args.validate_file, V, C)
 train_iter = iterators.SerialIterator(train_dataset, args.batchsize)
 validate_iter = iterators.SerialIterator(validate_dataset, args.batchsize,
                                          repeat=False, shuffle=False)
