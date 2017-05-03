@@ -1,6 +1,5 @@
 import chainer
 from chainer import functions as F
-from chainer import links as L
 import six
 
 from lib.models import gru
@@ -34,7 +33,8 @@ class StackedBiRNN(chainer.Chain):
         self.reset_state()
         for f, r in six.moves.zip(self.forward, self.reverse):
             xs_f = [f(x, seq) for x, seq in six.moves.zip(xs, is_seq_t)]
-            xs_r = [r(x, seq) for x, seq in six.moves.zip(xs[::-1], is_seq_t[::-1])]
+            xs_r = [r(x, seq) for x, seq in six.moves.zip(
+                    xs[::-1], is_seq_t[::-1])]
             xs_r.reverse()
             xs = [F.dropout(F.concat((x_f, x_r)), train=self.train)
                   for (x_f, x_r) in six.moves.zip(xs_f, xs_r)]
