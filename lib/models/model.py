@@ -21,7 +21,7 @@ class Model(chainer.Chain):
 
     def __call__(self, x):
         timestep = x.data.shape[1]
-        is_seq = acid.data != -1
+        is_seq = x.data != -1
         x = self.embed(x)
         x = F.expand_dims(x, 1)
         x = F.relu(self.cnn(x))
