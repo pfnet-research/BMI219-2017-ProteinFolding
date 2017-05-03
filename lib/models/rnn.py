@@ -7,10 +7,10 @@ from lib.models import gru
 
 
 def make_stacked_gru(input_dim, hidden_dim, out_dim, layer_num):
-    grus = [L.StatefulGRU(input_dim, hidden_dim)]
-    grus.extend([L.StatefulGRU(hidden_dim * 2, hidden_dim)
+    grus = [gru.GRU(input_dim, hidden_dim)]
+    grus.extend([gru.GRU(hidden_dim * 2, hidden_dim)
                  for _ in range(layer_num - 2)])
-    grus.append(L.StatefulGRU(hidden_dim * 2, out_dim))
+    grus.append(gru.GRU(hidden_dim * 2, out_dim))
     return chainer.ChainList(*grus)
 
 
