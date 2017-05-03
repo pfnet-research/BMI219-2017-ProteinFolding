@@ -2,8 +2,8 @@ import chainer
 from chainer import functions as F
 from chainer import links as L
 
-from lib.models import mlp as mlp_
 from lib.models import cnn as cnn_
+from lib.models import mlp as mlp_
 from lib.models import rnn as rnn_
 
 
@@ -26,7 +26,7 @@ class Model(chainer.Chain):
         x = F.relu(self.cnn(x))
         xs = F.split_axis(x, timestep, 2)
         xs = self.rnn(xs)
-        ys = [self.mlp(x) for x in xs]
+        ys = [self.mlp(x_) for x_ in xs]
         return F.stack(ys, -1)
 
 
