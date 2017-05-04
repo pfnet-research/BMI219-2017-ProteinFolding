@@ -129,7 +129,7 @@ In analogy, we can think of proteins as "biological sentences" consisting of
 The term "embedding" comes from the intuition of embedding each ID to a feature space.
 
 
-# Convolutional Neural Networks (CNN)
+## Convolutional Neural Networks (CNN)
 
 Next we convolve the resulting embedded vectors along the sequence.
 As each sample has a shape `(T, D)` where `T` is a time step and `D` is the dimension of embedded vectors, filters will have a shape of the form `(t, D)`.
