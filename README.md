@@ -1,9 +1,9 @@
 # Protein secondary structure prediction with cascaded CNN and RNN
 
-This is an example of application of deep learning to protein secondary structure prediction.
+This is an example of the application of deep learning to protein secondary structure prediction.
 This example is based on [1], but some minor modifications are applied.
 
-See commentary.md for the detail explanation
+See commentary.md for a detailed explanation
 
 
 # Dependency
