@@ -301,8 +301,6 @@ In this case, we do not have such a restriction on time length.
 I could be missing some information, but so far as I understand the paper, it was not clear which method was adopted.
 We choose the second approach in this example.
 
-(You can skip the latter half of this section)
-
 The first approach is intuitive.
 But the length of each sample in the dataset must be the same because the input dimension of the MLP (the length of the output of the RNN times the dimension of the output at each step) is fixed.
 In this particular example, this will not be problematic because the training and testing datasets are preprocessed so that all samples have same length.
