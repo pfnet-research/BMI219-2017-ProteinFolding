@@ -247,8 +247,7 @@ class StackedBiRNN(chainer.Chain):
     def __init__(self, input_dim, hidden_dim, out_dim, layer_num):
         forward = make_stacked_gru(input_dim, hidden_dim, out_dim, layer_num)
         reverse = make_stacked_gru(input_dim, hidden_dim, out_dim, layer_num)
-        super(StackedBiRNN, self).__init__(
-            forward=forward, reverse=reverse)
+        super(StackedBiRNN, self).__init__(forward=forward, reverse=reverse)
 ```
 I use the term "reverse" instead of "backward" because the reverse direction is still implemented as part of the forward propagation :).
 
