@@ -70,6 +70,7 @@ and Multi-Layer Perceptron (MLP).
 We can get the model with `lib.models.model.make_model`:
 Here is the pseudo code:
 ```python
+# lib/models/model.py
 def make_model(vocab, embed_dim, channel_num,
                rnn_dim, mlp_dim, class_num):
     # (Omitted)
@@ -90,6 +91,7 @@ Forward propagation is defined in `Model.__call__` as is customarily done in Cha
 It sequentially applies input features to each component:
 
 ```python
+# lib/models/model.py
 class Model(chainer.Chain):
 
     # (Omitted)
@@ -138,6 +140,7 @@ Specifically, we create 64 filters of length 3, 7, and 11, respectively,
 resulting in 192 filters in total:
 
 ```python
+# lib/models/model.py
 cnn = cnn_.MultiScaleCNN(
     1,  # input channel
     [64, 64, 64],  # output channels (64 kernels for each kernel size)
@@ -147,6 +150,7 @@ cnn = cnn_.MultiScaleCNN(
 Since [`L.Convolution2D`](http://docs.chainer.org/en/stable/reference/links.html#convolution2d) cannot handle filters of different sizes in single chain, we must therefore prepare as many chains as the different filter shapes:
 
 ```python
+# lib/models/cnn.py
 class MultiScaleCNN(chainer.ChainList):
 
     def __init__(self, in_channel, out_channels, kernel_sizes):
@@ -162,6 +166,7 @@ the outputs along the channel axis.
 We implement the forward propagation in `__call__` as usual:
 
 ```python
+# lib/models/cnn.py
 class MultiScaleCNN(chainer.ChainList):
 
     def __call__(self, x):
@@ -188,7 +193,7 @@ Suppose the status update at time `t` is formulated as follows :
 h' = update(h, x)
 ```
 
-Here, `h` and `h'` are states of RNN at time `t-1` and `t`, respectively, `x` is a input at time `t`, and `update` is an update formula specific to each RNN unit.
+Here, `h` and `h'` are states of RNN at time `t` and `t+1`, respectively, `x` is a input at time `t`, and `update` is an update formula specific to each RNN unit.
 
 The stateless RNN unit does not hold its internal state inside but instead takes the state as an input.
 The pseudo code of the stateless GRU is as follows:
@@ -222,6 +227,7 @@ We will use a two-layered bi-directional GRU here.
 First, we create a function that constructs a uni-directional RNN.
 
 ```python
+# lib/models/rnn.py
 def make_stacked_gru(input_dim, hidden_dim, out_dim, layer_num):
     grus = [L.StatefulGRU(input_dim, hidden_dim)]
     grus.extend([L.StatefulGRU(hidden_dim * 2, hidden_dim)
@@ -235,6 +241,7 @@ Q. Why is the output of layers other than the first layer is doubled?
 We combine two uni-directional RNNs: one for the forward direction and the other for the reverse direction, to create a bi-directional RNN:
 
 ```python
+# lib/models/rnn.py
 class StackedBiRNN(chainer.Chain):
 
     def __init__(self, input_dim, hidden_dim, out_dim, layer_num):
@@ -248,6 +255,7 @@ I use the term "reverse" instead of "backward" because the reverse direction is 
 As we will insert a dropout, which should behave differently in training and test phases, to the model. We put an attribute `train` to specifies the mode of the model:
 
 ```python
+# lib/models/rnn.py
 class StackedBiRNN(chainer.Chain):
 
     def __init__(self, input_dim, hidden_dim, out_dim, layer_num):
@@ -258,6 +266,7 @@ class StackedBiRNN(chainer.Chain):
 Finally, the forward propagation is defined in `__call__`:
 
 ```python
+# lib/models/rnn.py
 class StackedBiRNN(chainer.Chain):
 
     def __call__(self, xs):
@@ -313,6 +322,7 @@ The implementation is quite simple.
 We should simply apply the same MLP to the output sequence:
 
 ```python
+# lib/models/model.py
 class Model(chainer.Chain):
 
     def __call__(self, x):
@@ -356,6 +366,7 @@ In Chainer, we can realize weight decay as a [`WeightDecay`](http://docs.chainer
 hook to optimizers. Following the original paper, we also use weight decay.
 
 ```python
+# tools/train.py
 optimizer.add_hook(WeightDecay(1e-3))
 ```
 
@@ -368,6 +379,7 @@ The core part of the `Evaluator` is `evaluate` method.
 So, we inherit `Evaluator` and override the function to switch the mode of the model temporarily as follows:
 
 ```python
+# lib/evaluations/evaluator.py
 class Evaluator(E.Evaluator):
 
     def evaluate(self):
